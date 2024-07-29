@@ -1,16 +1,15 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Icon BASE64 Convertion
+# Icon BASE64 Conversion
 function ConvertFrom-Base64String {
     param ($base64String)
     $bytes = [System.Convert]::FromBase64String($base64String)
     $stream = New-Object System.IO.MemoryStream(,$bytes)
     return [System.Drawing.Icon]::FromHandle([System.Drawing.Bitmap]::FromStream($stream).GetHicon())
 }
-$base64Icon = ""
+$base64Icon = ""  # Inserta aquí tu base64 icon si es necesario
 
-# Crear el formulario principal
 $Form = New-Object System.Windows.Forms.Form
 $Form.Text = "SuperAD Administration"
 $Form.Size = New-Object System.Drawing.Size(1200, 900)
@@ -21,9 +20,10 @@ try {
     $Form.Icon = ConvertFrom-Base64String $base64Icon
 }
 catch {
-    Write-Host "The base64 icon is not correct, try to correct it!" -ForegroundColor Re
+    Write-Host "The base64 icon is not correct, try to correct it!" -ForegroundColor Red
 }
-# Crear controles para buscar usuarios
+
+# UI Controls
 $UserSearchLabel = New-Object System.Windows.Forms.Label
 $UserSearchLabel.Text = "Buscar Usuario:"
 $UserSearchLabel.Location = New-Object System.Drawing.Point(10, 10)
@@ -47,7 +47,6 @@ $UserListBox.Location = New-Object System.Drawing.Point(10, 40)
 $UserListBox.Size = New-Object System.Drawing.Size(400, 300)
 $Form.Controls.Add($UserListBox)
 
-# Crear controles para buscar grupos
 $GroupSearchLabel = New-Object System.Windows.Forms.Label
 $GroupSearchLabel.Text = "Buscar Grupo:"
 $GroupSearchLabel.Location = New-Object System.Drawing.Point(10, 350)
@@ -71,7 +70,6 @@ $GroupListBox.Location = New-Object System.Drawing.Point(10, 380)
 $GroupListBox.Size = New-Object System.Drawing.Size(400, 300)
 $Form.Controls.Add($GroupListBox)
 
-# Botones adicionales para acciones masivas
 $ListBlockedUsersButton = New-Object System.Windows.Forms.Button
 $ListBlockedUsersButton.Text = "Listar Usuarios Bloqueados"
 $ListBlockedUsersButton.Location = New-Object System.Drawing.Point(430, 40)
@@ -93,7 +91,36 @@ $ResetPasswordsButton.Size = New-Object System.Drawing.Size(200, 23)
 $ResetPasswordsButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($ResetPasswordsButton)
 
-# Evento de clic en botón de búsqueda de usuarios
+# New Buttons for additional features
+$AuditLoginsButton = New-Object System.Windows.Forms.Button
+$AuditLoginsButton.Text = "Auditar Logins"
+$AuditLoginsButton.Location = New-Object System.Drawing.Point(430, 130)
+$AuditLoginsButton.Size = New-Object System.Drawing.Size(200, 23)
+$AuditLoginsButton.BackColor = [System.Drawing.Color]::GhostWhite
+$Form.Controls.Add($AuditLoginsButton)
+
+$ManagePasswordPoliciesButton = New-Object System.Windows.Forms.Button
+$ManagePasswordPoliciesButton.Text = "Gestionar Políticas de Contraseña"
+$ManagePasswordPoliciesButton.Location = New-Object System.Drawing.Point(430, 160)
+$ManagePasswordPoliciesButton.Size = New-Object System.Drawing.Size(200, 23)
+$ManagePasswordPoliciesButton.BackColor = [System.Drawing.Color]::GhostWhite
+$Form.Controls.Add($ManagePasswordPoliciesButton)
+
+$MassCreateAccountsButton = New-Object System.Windows.Forms.Button
+$MassCreateAccountsButton.Text = "Crear Cuentas Masivamente"
+$MassCreateAccountsButton.Location = New-Object System.Drawing.Point(430, 190)
+$MassCreateAccountsButton.Size = New-Object System.Drawing.Size(200, 23)
+$MassCreateAccountsButton.BackColor = [System.Drawing.Color]::GhostWhite
+$Form.Controls.Add($MassCreateAccountsButton)
+
+$GenerateTemplatesButton = New-Object System.Windows.Forms.Button
+$GenerateTemplatesButton.Text = "Generar Plantillas"
+$GenerateTemplatesButton.Location = New-Object System.Drawing.Point(430, 220)
+$GenerateTemplatesButton.Size = New-Object System.Drawing.Size(200, 23)
+$GenerateTemplatesButton.BackColor = [System.Drawing.Color]::GhostWhite
+$Form.Controls.Add($GenerateTemplatesButton)
+
+# Event Handlers
 $UserSearchButton.Add_Click({
     $searchQuery = $UserSearchBox.Text
     $UserListBox.Items.Clear()
@@ -117,7 +144,6 @@ $UserSearchButton.Add_Click({
     }
 })
 
-# Evento de clic en botón de búsqueda de grupos
 $GroupSearchButton.Add_Click({
     $searchQuery = $GroupSearchBox.Text
     $GroupListBox.Items.Clear()
@@ -141,7 +167,223 @@ $GroupSearchButton.Add_Click({
     }
 })
 
-# Evento de clic en el botón de listar usuarios bloqueados
+$ListBlockedUsersButton.Add_Click({
+    $UserListBox.Items.Clear()
+    try {
+        $blockedUsers = Search-ADAccount -LockedOut -UsersOnly
+        if ($blockedUsers.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("No se encontraron usuarios bloqueados.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        }
+        foreach ($user in $blockedUsers) {
+            $UserListBox.Items.Add($user.Name)
+        }
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al listar usuarios bloqueados: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+})
+
+$UnlockAllUsersButton.Add_Click({
+    try {
+        $lockedUsers = Search-ADAccount -LockedOut -UsersOnly
+        foreach ($user in $lockedUsers) {
+            Unlock-ADAccount -Identity $user.SamAccountName
+        }
+        [System.Windows.Forms.MessageBox]::Show("Todos los usuarios bloqueados han sido desbloqueados.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al desbloquear usuarios: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+})
+
+$ResetPasswordsButton.Add_Click({
+    $user = [System.Windows.Forms.InputBox]::Show("Ingrese el nombre de usuario para restablecer la contraseña:", "Restablecer Contraseñas", "")
+    if ($user) {
+        try {
+            $newPassword = [System.Windows.Forms.InputBox]::Show("Ingrese la nueva contraseña:", "Restablecer Contraseñas", "")
+            if ($newPassword) {
+                Set-ADAccountPassword -Identity $user -NewPassword (ConvertTo-SecureString -AsPlainText $newPassword -Force) -Reset
+                [System.Windows.Forms.MessageBox]::Show("Contraseña restablecida con éxito.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            } else {
+                [System.Windows.Forms.MessageBox]::Show("No se ingresó una nueva contraseña.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error al restablecer la contraseña: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("No se ingresó el nombre de usuario.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    }
+})
+
+$AuditLoginsButton.Add_Click({
+# Función para mostrar la ventana de entrada del nombre de usuario
+# Función para mostrar la ventana de entrada del nombre de usuario
+function Show-UserInputDialog {
+    $inputForm = New-Object System.Windows.Forms.Form
+    $inputForm.Text = "Ingresar Nombre de Usuario"
+    $inputForm.Size = New-Object System.Drawing.Size(300, 150)
+    $inputForm.StartPosition = 'CenterScreen'
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "Ingrese el nombre de usuario:"
+    $label.Location = New-Object System.Drawing.Point(10, 20)
+    $label.Size = New-Object System.Drawing.Size(260, 20)
+    $inputForm.Controls.Add($label)
+
+    $textBox = New-Object System.Windows.Forms.TextBox
+    $textBox.Location = New-Object System.Drawing.Point(10, 50)
+    $textBox.Size = New-Object System.Drawing.Size(260, 20)
+    $inputForm.Controls.Add($textBox)
+
+    $okButton = New-Object System.Windows.Forms.Button
+    $okButton.Text = "Aceptar"
+    $okButton.Location = New-Object System.Drawing.Point(100, 80)
+    $okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+    $inputForm.Controls.Add($okButton)
+
+    $inputForm.AcceptButton = $okButton
+
+    if ($inputForm.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $textBox.Text
+    } else {
+        return $null
+    }
+}
+
+# Función para mostrar información de inicio y cierre de sesión en tiempo real
+function Show-RealTimeUserInfo {
+    param (
+        [string]$Username
+    )
+
+    if (-not $Username) {
+        [System.Windows.Forms.MessageBox]::Show("El nombre de usuario no puede estar vacío.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+        return
+    }
+
+    try {
+        # Preparar la ventana para mostrar la información
+        $infoForm = New-Object System.Windows.Forms.Form
+        $infoForm.Text = "Información de Inicio y Cierre de Sesión en Tiempo Real"
+        $infoForm.Size = New-Object System.Drawing.Size(800, 600)
+        $infoForm.StartPosition = 'CenterScreen'
+
+        $eventTextBox = New-Object System.Windows.Forms.TextBox
+        $eventTextBox.Location = New-Object System.Drawing.Point(10, 10)
+        $eventTextBox.Size = New-Object System.Drawing.Size(760, 500)
+        $eventTextBox.Multiline = $true
+        $eventTextBox.ScrollBars = 'Vertical'
+        $eventTextBox.ReadOnly = $true
+        $infoForm.Controls.Add($eventTextBox)
+
+        # Mostrar la ventana
+        $infoForm.Show()
+
+        # Crear un scriptblock para monitorear eventos en segundo plano
+        $scriptBlock = {
+            param ($username, $textBox, $form)
+            $filter = @{'LogName'='Security'; 'Id'=4624,4647}  # IDs para inicio de sesión y cierre de sesión
+
+            while ($form.Visible) {
+                try {
+                    # Filtrar eventos relevantes
+                    $events = Get-WinEvent -FilterHashtable $filter -ErrorAction Stop
+                    foreach ($event in $events) {
+                        $message = $event.Message
+                        if ($message -like "*$username*") {
+                            $eventDate = $event.TimeCreated.ToString('dd/MM/yyyy - HH:mm')
+                            if ($event.Id -eq 4624) {
+                                $eventType = 'Log in'
+                            } elseif ($event.Id -eq 4647) {
+                                $eventType = 'Log off'
+                            } else {
+                                continue
+                            }
+                            $updateText = "User: $username, $eventType $eventDate`r`n"
+                            $textBox.Invoke([action] { $textBox.AppendText($updateText) })
+                        }
+                    }
+                } catch {
+                    $textBox.Invoke([action] { $textBox.AppendText("Error al obtener la información: $_`r`n") })
+                }
+
+                Start-Sleep -Seconds 10
+            }
+        }
+
+        # Iniciar el trabajo en segundo plano
+        Start-Job -ScriptBlock $scriptBlock -ArgumentList $Username, $eventTextBox, $infoForm
+
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al iniciar el monitoreo: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+}
+
+# Obtener el nombre de usuario mediante la ventana de entrada
+$username = Show-UserInputDialog
+
+# Si se ingresó un nombre de usuario, empezar a monitorear eventos en tiempo real
+if ($username) {
+    Show-RealTimeUserInfo -Username $username
+}
+})
+
+$ManagePasswordPoliciesButton.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show("Funcionalidad de gestión de políticas de contraseña aún no implementada.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+})
+
+$MassCreateAccountsButton.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show("Funcionalidad para crear cuentas masivamente aún no implementada.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+})
+
+$GenerateTemplatesButton.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show("Funcionalidad para generar plantillas aún no implementada.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+})
+
+$UserSearchButton.Add_Click({
+    $searchQuery = $UserSearchBox.Text
+    $UserListBox.Items.Clear()
+    
+    if ($searchQuery) {
+        try {
+            $filter = "Name -like '*$searchQuery*'"
+            Write-Host "Buscando usuarios con el filtro: $filter"
+            $users = Get-ADUser -Filter $filter -Property Name
+            if ($users.Count -eq 0) {
+                [System.Windows.Forms.MessageBox]::Show("No se encontraron usuarios.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            }
+            foreach ($user in $users) {
+                $UserListBox.Items.Add($user.Name)
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error al buscar usuarios: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("Ingrese un texto de búsqueda.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    }
+})
+
+$GroupSearchButton.Add_Click({
+    $searchQuery = $GroupSearchBox.Text
+    $GroupListBox.Items.Clear()
+    
+    if ($searchQuery) {
+        try {
+            $filter = "Name -like '*$searchQuery*'"
+            Write-Host "Buscando grupos con el filtro: $filter"
+            $groups = Get-ADGroup -Filter $filter -Property Name
+            if ($groups.Count -eq 0) {
+                [System.Windows.Forms.MessageBox]::Show("No se encontraron grupos.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            }
+            foreach ($group in $groups) {
+                $GroupListBox.Items.Add($group.Name)
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error al buscar grupos: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        }
+    } else {
+        [System.Windows.Forms.MessageBox]::Show("Ingrese un texto de búsqueda.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+    }
+})
+
 $ListBlockedUsersButton.Add_Click({
     $UserListBox.Items.Clear()
     try {
@@ -157,7 +399,6 @@ $ListBlockedUsersButton.Add_Click({
     }
 })
 
-# Evento de clic en el botón de desbloquear todos los usuarios
 $UnlockAllUsersButton.Add_Click({
     try {
         $lockedUsers = Search-ADAccount -LockedOut -UsersOnly
@@ -170,7 +411,6 @@ $UnlockAllUsersButton.Add_Click({
     }
 })
 
-# Evento de clic en el botón de restablecer contraseñas
 $ResetPasswordsButton.Add_Click({
     $newPassword = [System.Windows.Forms.InputBox]::Show("Ingrese la nueva contraseña para todos los usuarios:", "Restablecer Contraseñas")
     if ($newPassword) {
@@ -186,7 +426,6 @@ $ResetPasswordsButton.Add_Click({
     }
 })
 
-# Evento de doble clic en un usuario de la lista
 $UserListBox.Add_DoubleClick({
     if ($UserListBox.SelectedItem) {
         $selectedUserName = $UserListBox.SelectedItem
@@ -199,7 +438,6 @@ $UserListBox.Add_DoubleClick({
     }
 })
 
-# Evento de doble clic en un grupo de la lista
 $GroupListBox.Add_DoubleClick({
     if ($GroupListBox.SelectedItem) {
         $selectedGroupName = $GroupListBox.SelectedItem
@@ -212,7 +450,6 @@ $GroupListBox.Add_DoubleClick({
     }
 })
 
-# Función para mostrar un formulario de entrada
 function Show-InputForm {
     param (
         [string]$Prompt,
@@ -249,7 +486,6 @@ function Show-InputForm {
     return $form.Tag
 }
 
-# Función para mostrar un formulario de entrada con texto oculto (contraseña)
 function Show-PasswordForm {
     param (
         [string]$Prompt,
@@ -287,7 +523,6 @@ function Show-PasswordForm {
     return $form.Tag
 }
 
-# Función para mostrar propiedades del usuario
 function ShowUserProperties {
     param ($user)
 
@@ -296,7 +531,6 @@ function ShowUserProperties {
     $userForm.Size = New-Object System.Drawing.Size(500, 400)
     $userForm.StartPosition = 'CenterScreen'
 
-    # Información del usuario
     $labels = @(
         "Nombre: $($user.Name)",
         "Nombre de Usuario: $($user.SamAccountName)",
@@ -307,7 +541,6 @@ function ShowUserProperties {
         "Último Inicio de Sesión: $($user.LastLogonDate)"
     )
     
-    # Estado de la cuenta y bloqueo
     $lockedOut = $user.LockedOut
     $enabled = $user.Enabled
     $statusLabels = @(
@@ -327,7 +560,6 @@ function ShowUserProperties {
         $yPos += 30
     }
 
-    # Estado de la cuenta y bloqueo
     $statusYPos = $yPos
     for ($i = 0; $i -lt $statusLabels.Length; $i += 2) {
         $titleLabel = New-Object System.Windows.Forms.Label
@@ -353,7 +585,6 @@ function ShowUserProperties {
         $statusYPos += 30
     }
 
-    # Botón para habilitar o deshabilitar
     $toggleButton = New-Object System.Windows.Forms.Button
     $toggleButton.Text = if ($enabled) { "Deshabilitar" } else { "Habilitar" }
     $toggleButton.Location = New-Object System.Drawing.Point(10, $statusYPos)
@@ -367,7 +598,6 @@ function ShowUserProperties {
                 Enable-ADAccount -Identity $user.SamAccountName
                 [System.Windows.Forms.MessageBox]::Show("Cuenta habilitada exitosamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
             }
-            # Actualizar la información del usuario
             ShowUserProperties (Get-ADUser -Identity $user.SamAccountName -Property *)
         } catch {
             [System.Windows.Forms.MessageBox]::Show("Error al cambiar el estado de la cuenta: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -375,7 +605,6 @@ function ShowUserProperties {
     })
     $userForm.Controls.Add($toggleButton)
 
-    # Botón para desbloquear
     $unlockButton = New-Object System.Windows.Forms.Button
     $unlockButton.Text = "Desbloquear"
     $unlockButton.Location = New-Object System.Drawing.Point(120, $statusYPos)
@@ -384,7 +613,6 @@ function ShowUserProperties {
         try {
             Unlock-ADAccount -Identity $user.SamAccountName
             [System.Windows.Forms.MessageBox]::Show("Cuenta desbloqueada exitosamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-            # Actualizar la información del usuario
             ShowUserProperties (Get-ADUser -Identity $user.SamAccountName -Property *)
         } catch {
             [System.Windows.Forms.MessageBox]::Show("Error al desbloquear cuenta: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
@@ -392,7 +620,6 @@ function ShowUserProperties {
     })
     $userForm.Controls.Add($unlockButton)
 
-    # Botón para restablecer contraseña
     $resetPasswordButton = New-Object System.Windows.Forms.Button
     $resetPasswordButton.Text = "Restablecer Contraseña"
     $resetPasswordButton.Location = New-Object System.Drawing.Point(230, $statusYPos)
@@ -410,7 +637,6 @@ function ShowUserProperties {
     })
     $userForm.Controls.Add($resetPasswordButton)
 
-    # Botón para crear nuevo usuario
     $createUserButtonYPos = $statusYPos + 40
     $createUserButton = New-Object System.Windows.Forms.Button
     $createUserButton.Text = "Crear Nuevo Usuario"
@@ -424,18 +650,16 @@ function ShowUserProperties {
 
             if ($newUserPassword) {
                 try {
-                    # Extraer el dominio del UserPrincipalName del usuario actual
                     $domain = $user.UserPrincipalName.Split('@')[1]
 
-                    # Definir los atributos para el nuevo usuario basados en el usuario actual, excluyendo el nombre y la contraseña
                     $newUserParams = @{
                         Name = $newUserName
                         GivenName = $user.GivenName
                         Surname = $user.Surname
                         SamAccountName = $newUserName
-                        UserPrincipalName = "$newUserName@$domain"  # Usar el dominio del usuario actual
-                        Path = $user.DistinguishedName  # Usar la misma unidad organizativa que el usuario actual
-                        AccountPassword = (ConvertTo-SecureString $newUserPassword -AsPlainText -Force)  # Usar la contraseña proporcionada
+                        UserPrincipalName = "$newUserName@$domain" 
+                        Path = $user.DistinguishedName
+                        AccountPassword = (ConvertTo-SecureString $newUserPassword -AsPlainText -Force)
                         Enabled = $true
                         EmailAddress = $user.EmailAddress
                         Department = $user.Department
@@ -450,8 +674,6 @@ function ShowUserProperties {
                         Country = $user.Country
                         Description = $user.Description
                     }
-
-                    # Crear el nuevo usuario
                     New-ADUser @newUserParams
 
                     [System.Windows.Forms.MessageBox]::Show("Nuevo usuario creado exitosamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
@@ -463,7 +685,6 @@ function ShowUserProperties {
     })
     $userForm.Controls.Add($createUserButton)
 
-    # Mostrar el formulario
     $userForm.Add_Shown({$userForm.Activate()})
     [void]$userForm.ShowDialog()
 }
@@ -472,19 +693,16 @@ function ShowUserProperties {
 function ShowGroupProperties {
     param ($group)
 
-    # Validar que el objeto $group sea válido
     if (-not $group -or $group.GetType().Name -ne 'ADGroup') {
         [System.Windows.Forms.MessageBox]::Show("El objeto del grupo no es válido.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
         return
     }
 
-    # Crear el formulario principal
     $groupForm = New-Object System.Windows.Forms.Form
     $groupForm.Text = "Propiedades del Grupo"
     $groupForm.Size = New-Object System.Drawing.Size(600, 400)
     $groupForm.StartPosition = 'CenterScreen'
 
-    # Información del grupo
     $labels = @(
         "Nombre: $($group.Name)",
         "Nombre de Grupo: $($group.SamAccountName)",
@@ -501,8 +719,6 @@ function ShowGroupProperties {
         $groupForm.Controls.Add($label)
         $yPos += 30
     }
-
-    # Crear un botón para modificar el grupo
     $modifyButton = New-Object System.Windows.Forms.Button
     $modifyButton.Text = "Modificar Grupo"
     $modifyButton.Location = New-Object System.Drawing.Point(10, $yPos)
@@ -512,7 +728,6 @@ function ShowGroupProperties {
     })
     $groupForm.Controls.Add($modifyButton)
 
-    # Mostrar el formulario
     $groupForm.ShowDialog()
 }
 
