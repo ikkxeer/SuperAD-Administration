@@ -636,55 +636,6 @@ function ShowUserProperties {
         }
     })
     $userForm.Controls.Add($resetPasswordButton)
-
-    $createUserButtonYPos = $statusYPos + 40
-    $createUserButton = New-Object System.Windows.Forms.Button
-    $createUserButton.Text = "Crear Nuevo Usuario"
-    $createUserButton.Location = New-Object System.Drawing.Point(10, $createUserButtonYPos)
-    $createUserButton.Size = New-Object System.Drawing.Size(150, 23)
-    $createUserButton.Add_Click({
-        $newUserName = Show-InputForm -Prompt "Ingrese el nombre del nuevo usuario:" -Title "Crear Nuevo Usuario"
-        
-        if ($newUserName) {
-            $newUserPassword = Show-PasswordForm -Prompt "Ingrese la contraseña para el nuevo usuario:" -Title "Crear Nuevo Usuario"
-
-            if ($newUserPassword) {
-                try {
-                    $domain = $user.UserPrincipalName.Split('@')[1]
-
-                    $newUserParams = @{
-                        Name = $newUserName
-                        GivenName = $user.GivenName
-                        Surname = $user.Surname
-                        SamAccountName = $newUserName
-                        UserPrincipalName = "$newUserName@$domain" 
-                        Path = $user.DistinguishedName
-                        AccountPassword = (ConvertTo-SecureString $newUserPassword -AsPlainText -Force)
-                        Enabled = $true
-                        EmailAddress = $user.EmailAddress
-                        Department = $user.Department
-                        Title = $user.Title
-                        Company = $user.Company
-                        Office = $user.Office
-                        Manager = $user.Manager
-                        StreetAddress = $user.StreetAddress
-                        City = $user.City
-                        State = $user.State
-                        PostalCode = $user.PostalCode
-                        Country = $user.Country
-                        Description = $user.Description
-                    }
-                    New-ADUser @newUserParams
-
-                    [System.Windows.Forms.MessageBox]::Show("Nuevo usuario creado exitosamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-                } catch {
-                    [System.Windows.Forms.MessageBox]::Show("Error al crear nuevo usuario: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-                }
-            }
-        }
-    })
-    $userForm.Controls.Add($createUserButton)
-
     $userForm.Add_Shown({$userForm.Activate()})
     [void]$userForm.ShowDialog()
 }
