@@ -585,10 +585,10 @@ function ShowUserProperties {
     $resetPasswordButton.Location = New-Object System.Drawing.Point(230, $statusYPos)
     $resetPasswordButton.Size = New-Object System.Drawing.Size(150, 23)
     $resetPasswordButton.Add_Click({
-        $newPassword = Show-PasswordForm -Prompt "Ingrese la nueva contraseña:" -Title "Restablecer Contraseña"
+        $newPassword = Show-PasswordForm -Prompt "Ingrese la nueva contraseña:" -Title "Restablecer Contraseña" -Secure
         if ($newPassword) {
             try {
-                Set-ADAccountPassword -Identity $user.SamAccountName -NewPassword (ConvertTo-SecureString $newPassword -AsPlainText -Force)
+                Set-ADAccountPassword -Identity $user.SamAccountName -NewPassword $newPassword
                 [System.Windows.Forms.MessageBox]::Show("Contraseña restablecida exitosamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
             } catch {
                 [System.Windows.Forms.MessageBox]::Show("Error al restablecer contraseña: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
