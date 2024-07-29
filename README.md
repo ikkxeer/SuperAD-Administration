@@ -26,7 +26,7 @@ AD-Massive provides an efficient solution for managing Active Directory. It offe
 
 - **PowerShell**: Version 5.1 or higher.
 - **Operating System**: Windows Server 2016 or newer, or Windows 10/11.
-- **Modules**: PowerShell `ActiveDirectory` module.
+- **Modules**: PowerShell **ActiveDirectory** module.
 - **Permissions**: Adequate permissions in Active Directory to execute administrative tasks.
 
 ## Contributing
