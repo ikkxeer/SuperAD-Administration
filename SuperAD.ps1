@@ -84,13 +84,6 @@ $UnlockAllUsersButton.Size = New-Object System.Drawing.Size(200, 23)
 $UnlockAllUsersButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($UnlockAllUsersButton)
 
-$ResetPasswordsButton = New-Object System.Windows.Forms.Button
-$ResetPasswordsButton.Text = "Restablecer Contraseñas"
-$ResetPasswordsButton.Location = New-Object System.Drawing.Point(430, 100)
-$ResetPasswordsButton.Size = New-Object System.Drawing.Size(200, 23)
-$ResetPasswordsButton.BackColor = [System.Drawing.Color]::GhostWhite
-$Form.Controls.Add($ResetPasswordsButton)
-
 # New Buttons for additional features
 $AuditLoginsButton = New-Object System.Windows.Forms.Button
 $AuditLoginsButton.Text = "Auditar Logins"
@@ -194,24 +187,6 @@ $UnlockAllUsersButton.Add_Click({
     }
 })
 
-$ResetPasswordsButton.Add_Click({
-    $user = [System.Windows.Forms.InputBox]::Show("Ingrese el nombre de usuario para restablecer la contraseña:", "Restablecer Contraseñas", "")
-    if ($user) {
-        try {
-            $newPassword = [System.Windows.Forms.InputBox]::Show("Ingrese la nueva contraseña:", "Restablecer Contraseñas", "")
-            if ($newPassword) {
-                Set-ADAccountPassword -Identity $user -NewPassword (ConvertTo-SecureString -AsPlainText $newPassword -Force) -Reset
-                [System.Windows.Forms.MessageBox]::Show("Contraseña restablecida con éxito.", "Información", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-            } else {
-                [System.Windows.Forms.MessageBox]::Show("No se ingresó una nueva contraseña.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-            }
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error al restablecer la contraseña: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-        }
-    } else {
-        [System.Windows.Forms.MessageBox]::Show("No se ingresó el nombre de usuario.", "Advertencia", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
-    }
-})
 
 $AuditLoginsButton.Add_Click({
 # Función para mostrar la ventana de entrada del nombre de usuario
@@ -408,21 +383,6 @@ $UnlockAllUsersButton.Add_Click({
         [System.Windows.Forms.MessageBox]::Show("Todas las cuentas bloqueadas han sido desbloqueadas.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     } catch {
         [System.Windows.Forms.MessageBox]::Show("Error al desbloquear cuentas: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-    }
-})
-
-$ResetPasswordsButton.Add_Click({
-    $newPassword = [System.Windows.Forms.InputBox]::Show("Ingrese la nueva contraseña para todos los usuarios:", "Restablecer Contraseñas")
-    if ($newPassword) {
-        try {
-            $users = Get-ADUser -Filter * -Property SamAccountName
-            foreach ($user in $users) {
-                Set-ADAccountPassword -Identity $user.SamAccountName -NewPassword (ConvertTo-SecureString $newPassword -AsPlainText -Force) -Reset
-            }
-            [System.Windows.Forms.MessageBox]::Show("Contraseñas restablecidas exitosamente para todos los usuarios.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error al restablecer contraseñas: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
-        }
     }
 })
 
