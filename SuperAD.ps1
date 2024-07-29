@@ -15,6 +15,8 @@ $Form = New-Object System.Windows.Forms.Form
 $Form.Text = "SuperAD Administration"
 $Form.Size = New-Object System.Drawing.Size(1200, 900)
 $Form.StartPosition = 'CenterScreen'
+$Form.BackColor = [System.Drawing.Color]::LightSteelBlue
+
 try {
     $Form.Icon = ConvertFrom-Base64String $base64Icon
 }
@@ -37,6 +39,7 @@ $UserSearchButton = New-Object System.Windows.Forms.Button
 $UserSearchButton.Text = "Buscar"
 $UserSearchButton.Location = New-Object System.Drawing.Point(330, 10)
 $UserSearchButton.Size = New-Object System.Drawing.Size(75, 23)
+$UserSearchButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($UserSearchButton)
 
 $UserListBox = New-Object System.Windows.Forms.ListBox
@@ -60,6 +63,7 @@ $GroupSearchButton = New-Object System.Windows.Forms.Button
 $GroupSearchButton.Text = "Buscar"
 $GroupSearchButton.Location = New-Object System.Drawing.Point(330, 350)
 $GroupSearchButton.Size = New-Object System.Drawing.Size(75, 23)
+$GroupSearchButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($GroupSearchButton)
 
 $GroupListBox = New-Object System.Windows.Forms.ListBox
@@ -72,18 +76,21 @@ $ListBlockedUsersButton = New-Object System.Windows.Forms.Button
 $ListBlockedUsersButton.Text = "Listar Usuarios Bloqueados"
 $ListBlockedUsersButton.Location = New-Object System.Drawing.Point(430, 40)
 $ListBlockedUsersButton.Size = New-Object System.Drawing.Size(200, 23)
+$ListBlockedUsersButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($ListBlockedUsersButton)
 
 $UnlockAllUsersButton = New-Object System.Windows.Forms.Button
 $UnlockAllUsersButton.Text = "Desbloquear Todos"
 $UnlockAllUsersButton.Location = New-Object System.Drawing.Point(430, 70)
 $UnlockAllUsersButton.Size = New-Object System.Drawing.Size(200, 23)
+$UnlockAllUsersButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($UnlockAllUsersButton)
 
 $ResetPasswordsButton = New-Object System.Windows.Forms.Button
 $ResetPasswordsButton.Text = "Restablecer Contraseñas"
 $ResetPasswordsButton.Location = New-Object System.Drawing.Point(430, 100)
 $ResetPasswordsButton.Size = New-Object System.Drawing.Size(200, 23)
+$ResetPasswordsButton.BackColor = [System.Drawing.Color]::GhostWhite
 $Form.Controls.Add($ResetPasswordsButton)
 
 # Evento de clic en botón de búsqueda de usuarios
@@ -508,146 +515,158 @@ function ShowGroupProperties {
     # Mostrar el formulario
     $groupForm.ShowDialog()
 }
+
 function ShowGroupModificationForm {
-    param (
-        [Parameter(Mandatory=$true)]
-        [string]$GroupName
+    param ($group)
+
+    # Validar que el objeto $group sea válido
+    if (-not $group -or $group.GetType().Name -ne 'ADGroup') {
+        [System.Windows.Forms.MessageBox]::Show("El objeto del grupo no es válido.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        return
+    }
+
+    # Crear el formulario de modificación del grupo
+    $modifyForm = New-Object System.Windows.Forms.Form
+    $modifyForm.Text = "Modificar Grupo"
+    $modifyForm.Size = New-Object System.Drawing.Size(750, 500)
+    $modifyForm.StartPosition = 'CenterScreen'
+
+    # Crear el CheckedListBox de usuarios actuales
+    $userCheckedListBox = New-Object System.Windows.Forms.CheckedListBox
+    $userCheckedListBox.Location = New-Object System.Drawing.Point(10, 10)
+    $userCheckedListBox.Size = New-Object System.Drawing.Size(300, 200)
+    $modifyForm.Controls.Add($userCheckedListBox)
+
+    # Crear el CheckedListBox de usuarios disponibles
+    $availableUsersCheckedListBox = New-Object System.Windows.Forms.CheckedListBox
+    $availableUsersCheckedListBox.Location = New-Object System.Drawing.Point(320, 10)
+    $availableUsersCheckedListBox.Size = New-Object System.Drawing.Size(300, 200)
+    $modifyForm.Controls.Add($availableUsersCheckedListBox)
+
+    # Cargar los miembros actuales del grupo en el CheckedListBox
+    try {
+        $groupMembers = Get-ADGroupMember -Identity $group -ErrorAction Stop
+        foreach ($member in $groupMembers) {
+            $userCheckedListBox.Items.Add($member.SamAccountName, $true)
+        }
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al cargar miembros del grupo: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+
+    # Cargar usuarios disponibles en el CheckedListBox
+    try {
+        $allUsers = Get-ADUser -Filter * -Property SamAccountName -ErrorAction Stop
+        $groupUserNames = $groupMembers | ForEach-Object { $_.SamAccountName }
+        foreach ($user in $allUsers) {
+            if (-not ($groupUserNames -contains $user.SamAccountName)) {
+                $availableUsersCheckedListBox.Items.Add($user.SamAccountName, $false)
+            }
+        }
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error al cargar usuarios disponibles: $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+
+    # Crear los controles para añadir usuarios
+    $addUserButton = New-Object System.Windows.Forms.Button
+    $addUserButton.Text = "Añadir Seleccionados"
+    $addUserButton.Location = New-Object System.Drawing.Point(320, 220)
+    $addUserButton.Size = New-Object System.Drawing.Size(150, 23)
+    $addUserButton.Add_Click({
+        $selectedUsers = @($availableUsersCheckedListBox.CheckedItems)
+        if ($selectedUsers.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Seleccione uno o más usuarios para añadir.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        } else {
+            $usersToAdd = $selectedUsers.Clone()  # Crear una copia de la selección
+            foreach ($selectedUser in $usersToAdd) {
+                try {
+                    $user = Get-ADUser -Identity $selectedUser -ErrorAction Stop
+                    Add-ADGroupMember -Identity $group -Members $user -ErrorAction Stop
+                    $userCheckedListBox.Items.Add($selectedUser, $true)
+                    $availableUsersCheckedListBox.Items.Remove($selectedUser)
+                } catch {
+                    [System.Windows.Forms.MessageBox]::Show("Error al añadir usuario '$selectedUser': $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                }
+            }
+            [System.Windows.Forms.MessageBox]::Show("Usuarios añadidos correctamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        }
+    })
+    $modifyForm.Controls.Add($addUserButton)
+
+    # Crear los controles para eliminar usuarios
+    $removeUserButton = New-Object System.Windows.Forms.Button
+    $removeUserButton.Text = "Eliminar Seleccionados"
+    $removeUserButton.Location = New-Object System.Drawing.Point(10, 220)
+    $removeUserButton.Size = New-Object System.Drawing.Size(150, 23)
+    $removeUserButton.Add_Click({
+        $selectedUsers = @($userCheckedListBox.CheckedItems)
+        if ($selectedUsers.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Seleccione uno o más usuarios para eliminar.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        } else {
+            $usersToRemove = $selectedUsers.Clone()  # Crear una copia de la selección
+            foreach ($selectedUser in $usersToRemove) {
+                try {
+                    $user = Get-ADUser -Identity $selectedUser -ErrorAction Stop
+                    Remove-ADGroupMember -Identity $group -Members $user -Confirm:$false -ErrorAction Stop
+                    $userCheckedListBox.Items.Remove($selectedUser)
+                    $availableUsersCheckedListBox.Items.Add($selectedUser, $false)
+                } catch {
+                    [System.Windows.Forms.MessageBox]::Show("Error al eliminar usuario '$selectedUser': $_", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+                }
+            }
+            [System.Windows.Forms.MessageBox]::Show("Usuarios eliminados correctamente.", "Éxito", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        }
+    })
+    $modifyForm.Controls.Add($removeUserButton)
+
+    # Mostrar el formulario de modificación
+    $modifyForm.ShowDialog()
+}
+
+function ShowGroupProperties {
+    param ($group)
+
+    # Validar que el objeto $group sea válido
+    if (-not $group -or $group.GetType().Name -ne 'ADGroup') {
+        [System.Windows.Forms.MessageBox]::Show("El objeto del grupo no es válido.", "Error", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        return
+    }
+
+    # Crear el formulario principal
+    $groupForm = New-Object System.Windows.Forms.Form
+    $groupForm.Text = "Propiedades del Grupo"
+    $groupForm.Size = New-Object System.Drawing.Size(600, 400)
+    $groupForm.StartPosition = 'CenterScreen'
+
+    # Información del grupo
+    $labels = @(
+        "Nombre: $($group.Name)",
+        "Nombre de Grupo: $($group.SamAccountName)",
+        "Descripción: $($group.Description)",
+        "Fecha de Creación: $($group.WhenCreated)"
     )
 
-    function Get-GroupUsers {
-        param (
-            [string]$GroupName
-        )
-        $group = Get-ADGroup -Filter { Name -eq $GroupName } -Properties Members
-        if ($null -eq $group) {
-            Write-Host "No se encontró el grupo '$GroupName'."
-            return @()
-        }
-        $groupMembers = $group.Members | ForEach-Object { (Get-ADUser -Identity $_).SamAccountName }
-        return $groupMembers
+    $yPos = 10
+    foreach ($labelText in $labels) {
+        $label = New-Object System.Windows.Forms.Label
+        $label.Text = $labelText
+        $label.Location = New-Object System.Drawing.Point(10, $yPos)
+        $label.Size = New-Object System.Drawing.Size(560, 20)
+        $groupForm.Controls.Add($label)
+        $yPos += 30
     }
 
-    function Get-NonGroupUsers {
-        param (
-            [string]$GroupName
-        )
-        $allUsers = Get-ADUser -Filter * | Select-Object -ExpandProperty SamAccountName
-        $groupMembers = Get-GroupUsers -GroupName $GroupName
-        $nonGroupUsers = $allUsers | Where-Object { $_ -notin $groupMembers }
-        return $nonGroupUsers
-    }
-
-    $groupMembers = Get-GroupUsers -GroupName $GroupName
-    $nonGroupUsers = Get-NonGroupUsers -GroupName $GroupName
-
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Modificar Miembros del Grupo"
-    $form.Size = New-Object System.Drawing.Size(900, 700)
-    $form.StartPosition = 'CenterScreen'
-
-    $membersListBox = New-Object System.Windows.Forms.CheckedListBox
-    $membersListBox.Location = New-Object System.Drawing.Point(20, 20)
-    $membersListBox.Size = New-Object System.Drawing.Size(350, 500)
-    $membersListBox.DataSource = $groupMembers
-    $membersListBox.CheckOnClick = $true
-    $form.Controls.Add($membersListBox)
-
-    $nonMembersListBox = New-Object System.Windows.Forms.CheckedListBox
-    $nonMembersListBox.Location = New-Object System.Drawing.Point(490, 20)
-    $nonMembersListBox.Size = New-Object System.Drawing.Size(350, 500)
-    $nonMembersListBox.DataSource = $nonGroupUsers
-    $nonMembersListBox.CheckOnClick = $true
-    $form.Controls.Add($nonMembersListBox)
-
-    $addButton = New-Object System.Windows.Forms.Button
-    $addButton.Text = "→"
-    $addButton.Location = New-Object System.Drawing.Point(380, 200)
-    $addButton.Size = New-Object System.Drawing.Size(60, 40)
-    $addButton.Add_Click({
-        # Forzar actualización de CheckedItems
-        $membersListBox.SelectedItems.Clear()
-        $nonMembersListBox.SelectedItems.Clear()
-
-        $selectedUsers = $nonMembersListBox.CheckedItems
-        if ($selectedUsers.Count -gt 0) {
-            foreach ($user in $selectedUsers) {
-                Add-ADGroupMember -Identity $GroupName -Members $user
-            }
-            # Actualizar listas
-            $groupMembers += $selectedUsers
-            $nonGroupUsers = $nonGroupUsers | Where-Object { $_ -notin $selectedUsers }
-            $membersListBox.DataSource = $null
-            $membersListBox.DataSource = $groupMembers
-            $nonMembersListBox.DataSource = $null
-            $nonMembersListBox.DataSource = $nonGroupUsers
-        }
+    # Crear un botón para modificar el grupo
+    $modifyButton = New-Object System.Windows.Forms.Button
+    $modifyButton.Text = "Modificar Grupo"
+    $modifyButton.Location = New-Object System.Drawing.Point(10, $yPos)
+    $modifyButton.Size = New-Object System.Drawing.Size(150, 23)
+    $modifyButton.Add_Click({
+        ShowGroupModificationForm -group $group
     })
-    $form.Controls.Add($addButton)
+    $groupForm.Controls.Add($modifyButton)
 
-    $removeButton = New-Object System.Windows.Forms.Button
-    $removeButton.Text = "←"
-    $removeButton.Location = New-Object System.Drawing.Point(380, 260)
-    $removeButton.Size = New-Object System.Drawing.Size(60, 40)
-    $removeButton.Add_Click({
-        # Forzar actualización de CheckedItems
-        $membersListBox.SelectedItems.Clear()
-        $nonMembersListBox.SelectedItems.Clear()
-
-        $selectedUsers = $membersListBox.CheckedItems
-        if ($selectedUsers.Count -gt 0) {
-            foreach ($user in $selectedUsers) {
-                Remove-ADGroupMember -Identity $GroupName -Members $user -Confirm:$false
-            }
-            # Actualizar listas
-            $nonGroupUsers += $selectedUsers
-            $groupMembers = $groupMembers | Where-Object { $_ -notin $selectedUsers }
-            $membersListBox.DataSource = $null
-            $membersListBox.DataSource = $groupMembers
-            $nonMembersListBox.DataSource = $null
-            $nonMembersListBox.DataSource = $nonGroupUsers
-        }
-    })
-    $form.Controls.Add($removeButton)
-
-    $saveButton = New-Object System.Windows.Forms.Button
-    $saveButton.Text = "Guardar Cambios"
-    $saveButton.Location = New-Object System.Drawing.Point(250, 550)
-    $saveButton.Size = New-Object System.Drawing.Size(120, 30)
-    $saveButton.Add_Click({
-        $selectedToAdd = $nonMembersListBox.CheckedItems
-        if ($selectedToAdd.Count -gt 0) {
-            foreach ($user in $selectedToAdd) {
-                Add-ADGroupMember -Identity $GroupName -Members $user
-            }
-        }
-
-        $selectedToRemove = $membersListBox.CheckedItems
-        if ($selectedToRemove.Count -gt 0) {
-            foreach ($user in $selectedToRemove) {
-                Remove-ADGroupMember -Identity $GroupName -Members $user -Confirm:$false
-            }
-        }
-
-        # Actualizar las listas para reflejar los cambios
-        $groupMembers = Get-GroupUsers -GroupName $GroupName
-        $nonGroupUsers = Get-NonGroupUsers -GroupName $GroupName
-        $membersListBox.DataSource = $null
-        $membersListBox.DataSource = $groupMembers
-        $nonMembersListBox.DataSource = $null
-        $nonMembersListBox.DataSource = $nonGroupUsers
-    })
-    $form.Controls.Add($saveButton)
-
-    $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Text = "Cancelar"
-    $cancelButton.Location = New-Object System.Drawing.Point(400, 550)
-    $cancelButton.Size = New-Object System.Drawing.Size(100, 30)
-    $cancelButton.Add_Click({
-        $form.Close()
-    })
-    $form.Controls.Add($cancelButton)
-
-    $form.ShowDialog()
+    # Mostrar el formulario
+    $groupForm.ShowDialog()
 }
 
 # Mostrar el formulario principal
