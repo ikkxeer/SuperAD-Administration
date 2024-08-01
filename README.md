@@ -1,4 +1,7 @@
-# SuperAD-Administration
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/ac4a8738-8e50-4acd-98e5-08b8a000a598" alt="SuperAD logo" height="300" width="215">
+</div>
+<h1 align="center">SuperAD-Administration</h1>
 
 **SuperAD** is a PowerShell script designed for bulk Active Directory administration with an intuitive graphical interface. This script simplifies managing users, groups, and other administrative tasks in Active Directory using a user-friendly GUI (Graphical User Interface).
 
